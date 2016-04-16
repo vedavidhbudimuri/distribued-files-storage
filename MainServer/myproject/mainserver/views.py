@@ -287,46 +287,56 @@ def forward_request(request, **kwargs):
     ##            CHECK CONSISTENCY
 
 
-    success_count = 0
-    while True :
-        server = FORWARD_TO_SERVERS[COUNTER%3]
-        COUNTER += 1
-        response = forward_request_func(request,url=server,
-                                        url_tail=tail,
-                                        is_dns=False)
+    if "delete_files_folders" in tail :
+        print " We got a delete request"
+        from common.utilities import delete_files_folders_func
+        
+        
+        fs_objects = delete_files_folders_func(request)
 
-        if response.status_code in [200,201] :
-
-            print "we got a success response "
-            success_count += 1
-            if "create_folder" in tail :
-
-                print "Its a file or folder creation request "
-                data = request.data
-                create_file_and_folder(data,server,type="FOLDER")
-
-            elif  "upload_file" in tail  :
-                print "Its a file or folder creation request "
-                data = request.data
-                create_file_and_folder(data,server,type="FILE",file=request.FILES['docfile'])
-
-            elif "delete_files_folders" in tail :
-                print " We got a delete request"
-                from common.utilities import delete_files_folders_func
-                fs_objects = delete_files_folders_func(request)
-
-            success_ips.append(server)
-
-        else :
-            failure_ips.append(server)
-
-        if success_count  == 1 :
-            break
+        for server in FORWARD_TO_SERVERS :
+            response = forward_request_func(request,url=server,
+                                            url_tail=tail,
+                                            is_dns=False)
 
 
-        if len(success_ips) + len(failure_ips) == len(FORWARD_TO_SERVERS) :
-            print ("Couldn't connect")
-            return Response(status=status.HTTP_417_EXPECTATION_FAILED)
+    else :
+        while True :
+            server = FORWARD_TO_SERVERS[COUNTER%3]
+            COUNTER += 1
+            response = forward_request_func(request,url=server,
+                                            url_tail=tail,
+                                            is_dns=False)
+
+            if response.status_code in [200,201] :
+
+                print "we got a success response "
+                success_count += 1
+                if "create_folder" in tail :
+
+                    print "Its a file or folder creation request "
+                    data = request.data
+                    create_file_and_folder(data,server,type="FOLDER")
+
+                elif  "upload_file" in tail  :
+                    print "Its a file or folder creation request "
+                    data = request.data
+                    create_file_and_folder(data,server,type="FILE",file=request.FILES['docfile'])
+
+                
+
+                success_ips.append(server)
+
+            else :
+                failure_ips.append(server)
+
+            if success_count  == 2 :
+                break
+
+
+            if len(success_ips) + len(failure_ips) == len(FORWARD_TO_SERVERS) :
+                print ("Couldn't connect")
+                return Response(status=status.HTTP_417_EXPECTATION_FAILED)
 
 
     return Response(status=status.HTTP_200_OK)
